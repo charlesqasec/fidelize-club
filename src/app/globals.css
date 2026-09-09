@@ -1,0 +1,696 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Fidelize.club — design tokens
+   Paleta extraída das referências visuais do projeto (_referencias/).
+   ========================================================================== */
+
+@theme {
+  --color-brand-50: #f6f4ff;
+  --color-brand-100: #ece7fe;
+  --color-brand-200: #dbd2fd;
+  --color-brand-300: #c0affb;
+  --color-brand-400: #a184f7;
+  --color-brand-500: #8257ef;
+  --color-brand-600: #6d3ce0;
+  --color-brand-700: #5b2cc0;
+  --color-brand-800: #46209a;
+  --color-brand-900: #331370;
+  --color-brand-950: #1e0b47;
+
+  --color-ink: #16102e;
+  --color-ink-soft: #4a4363;
+  --color-ink-muted: #6f6889;
+
+  --color-surface: #ffffff;
+  --color-surface-soft: #f7f6fc;
+  --color-line: #e7e4f2;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-poppins), var(--font-inter), ui-sans-serif, sans-serif;
+
+  --radius-4xl: 2rem;
+  --radius-5xl: 2.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Foco visível consistente em toda a página (acessibilidade). */
+:where(a, button, [role="button"], summary, input, select, textarea):focus-visible {
+  outline: 3px solid var(--color-brand-500);
+  outline-offset: 3px;
+  border-radius: 0.5rem;
+}
+
+/* Foco em superfícies escuras. */
+.on-dark :where(a, button):focus-visible {
+  outline-color: var(--color-brand-300);
+}
+
+/* --------------------------------------------------------------------------
+   Modal do certificado (elemento <dialog> nativo)
+   -------------------------------------------------------------------------- */
+
+dialog::backdrop {
+  background: rgba(22, 16, 46, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+dialog[open] {
+  animation: dialog-in 180ms ease-out;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   Motion — só transform/opacity. Estados ocultos existem apenas com
+   html[data-js] (script no layout): sem JS, tudo fica visível.
+   ========================================================================== */
+
+/* --- Scroll reveal (Reveal.tsx) ------------------------------------------ */
+
+[data-reveal],
+[data-reveal-stagger] > * {
+  transition:
+    opacity 700ms var(--ease-out),
+    transform 700ms var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+html[data-js] [data-reveal]:not([data-inview]),
+html[data-js] [data-reveal-stagger]:not([data-inview]) > * {
+  opacity: 0;
+}
+
+html[data-js] [data-reveal="up"]:not([data-inview]),
+html[data-js] [data-reveal-stagger="up"]:not([data-inview]) > * {
+  transform: translate3d(0, 18px, 0);
+}
+
+html[data-js] [data-reveal="scale"]:not([data-inview]),
+html[data-js] [data-reveal-stagger="scale"]:not([data-inview]) > * {
+  transform: translate3d(0, 14px, 0) scale(0.965);
+}
+
+html[data-js] [data-reveal="left"]:not([data-inview]),
+html[data-js] [data-reveal-stagger="left"]:not([data-inview]) > * {
+  transform: translate3d(-22px, 0, 0);
+}
+
+html[data-js] [data-reveal="right"]:not([data-inview]),
+html[data-js] [data-reveal-stagger="right"]:not([data-inview]) > * {
+  transform: translate3d(22px, 0, 0);
+}
+
+html[data-js] [data-reveal="notify"]:not([data-inview]),
+html[data-js] [data-reveal-stagger="notify"]:not([data-inview]) > * {
+  transform: translate3d(26px, 0, 0) scale(0.98);
+}
+
+[data-reveal-stagger] > :nth-child(1) { transition-delay: calc(var(--reveal-delay, 0ms) + 0ms); }
+[data-reveal-stagger] > :nth-child(2) { transition-delay: calc(var(--reveal-delay, 0ms) + 70ms); }
+[data-reveal-stagger] > :nth-child(3) { transition-delay: calc(var(--reveal-delay, 0ms) + 140ms); }
+[data-reveal-stagger] > :nth-child(4) { transition-delay: calc(var(--reveal-delay, 0ms) + 210ms); }
+[data-reveal-stagger] > :nth-child(5) { transition-delay: calc(var(--reveal-delay, 0ms) + 280ms); }
+[data-reveal-stagger] > :nth-child(6) { transition-delay: calc(var(--reveal-delay, 0ms) + 350ms); }
+[data-reveal-stagger] > :nth-child(7) { transition-delay: calc(var(--reveal-delay, 0ms) + 420ms); }
+[data-reveal-stagger] > :nth-child(8) { transition-delay: calc(var(--reveal-delay, 0ms) + 490ms); }
+[data-reveal-stagger] > :nth-child(9) { transition-delay: calc(var(--reveal-delay, 0ms) + 560ms); }
+[data-reveal-stagger] > :nth-child(n + 10) { transition-delay: calc(var(--reveal-delay, 0ms) + 630ms); }
+
+/* --- Hero: entrada curta (o visitante lê e clica imediatamente) ---------- */
+
+html[data-js] .hero-in {
+  opacity: 0;
+  animation: hero-in 640ms var(--ease-out) forwards;
+  animation-delay: calc(var(--i, 0) * 100ms + 60ms);
+}
+
+html[data-js] .hero-in-visual {
+  opacity: 0;
+  animation: hero-in-visual 820ms var(--ease-out) forwards;
+  animation-delay: calc(var(--i, 0) * 100ms + 60ms);
+}
+
+@keyframes hero-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hero-in-visual {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 26px, 0) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Parallax por cursor (ParallaxScene.tsx) ----------------------------- */
+
+.parallax-scene {
+  perspective: 1200px;
+}
+
+[data-parallax-layer] {
+  transform:
+    translate3d(
+      calc(var(--mx, 0) * var(--px, 0) * 1px),
+      calc(var(--my, 0) * var(--py, 0) * 1px),
+      0
+    )
+    rotateX(calc(var(--my, 0) * var(--rx, 0) * -1deg))
+    rotateY(calc(var(--mx, 0) * var(--ry, 0) * 1deg));
+  transition: transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+/* --- Ondas NFC (uma vez, 3 pulsos — nunca infinito) ---------------------- */
+
+.nfc-waves {
+  position: absolute;
+  left: 53%;
+  top: 36%;
+  width: 3.2rem;
+  height: 3.2rem;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.nfc-waves span {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid rgb(192 175 251 / 0.9);
+  opacity: 0;
+  transform: scale(0.4);
+}
+
+[data-inview] .nfc-waves span {
+  animation: nfc-wave 1500ms ease-out 3;
+  animation-delay: calc(var(--w, 0) * 300ms + 900ms);
+}
+
+@keyframes nfc-wave {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  18% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+/* Pulso único no ícone do passo "Encosta" (Como funciona). */
+.nfc-pulse {
+  position: relative;
+}
+
+.nfc-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid var(--color-brand-400);
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-inview] .nfc-pulse::after {
+  animation: nfc-ring 1400ms ease-out 2;
+  animation-delay: 500ms;
+}
+
+@keyframes nfc-ring {
+  0% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+}
+
+/* --- Assinatura visual: linha da jornada (StepsJourney.tsx) -------------- */
+
+.journey-line {
+  position: absolute;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--color-brand-300), var(--color-brand-600));
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.journey-line--h {
+  transform-origin: left center;
+  transform: scaleX(var(--progress, 0));
+  transition: transform 140ms linear;
+}
+
+.journey-line--v {
+  background: linear-gradient(180deg, var(--color-brand-300), var(--color-brand-600));
+  transform-origin: center top;
+  transform: scaleY(var(--progress, 0));
+  transition: transform 140ms linear;
+}
+
+.journey-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.85) 50%, transparent);
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.journey-line--v::after {
+  background: linear-gradient(180deg, transparent, rgb(255 255 255 / 0.85) 50%, transparent);
+  transform: translateY(-100%);
+}
+
+[data-inview] .journey-line--h::after {
+  animation: journey-pulse-h 2200ms ease-in-out 2;
+  animation-delay: 700ms;
+}
+
+[data-inview] .journey-line--v::after {
+  animation: journey-pulse-v 2200ms ease-in-out 2;
+  animation-delay: 700ms;
+}
+
+@keyframes journey-pulse-h {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes journey-pulse-v {
+  0% {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+/* --- Cartão digital: progresso, recompensa, campanha (CartaoDemo.tsx) ---- */
+
+.card-block {
+  transition:
+    opacity 620ms var(--ease-out),
+    transform 620ms var(--ease-out);
+}
+
+.card-block--hidden {
+  opacity: 0;
+  transform: translate3d(0, 12px, 0);
+}
+
+.card-notify--hidden {
+  opacity: 0;
+  transform: translate3d(28px, 0, 0);
+}
+
+.dot-pop {
+  animation: dot-pop 420ms var(--ease-out) both;
+}
+
+@keyframes dot-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.reward-box {
+  transition:
+    background-color 500ms var(--ease-out),
+    box-shadow 500ms var(--ease-out);
+}
+
+.reward-box--unlocked {
+  animation: reward-glow 1400ms ease-out 2;
+}
+
+.reward-box--unlocked .reward-icon {
+  animation: dot-pop 600ms var(--ease-out) both;
+}
+
+@keyframes reward-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(109 60 224 / 0);
+  }
+  40% {
+    box-shadow:
+      0 0 0 8px rgb(109 60 224 / 0.16),
+      0 12px 32px -12px rgb(109 60 224 / 0.55);
+  }
+}
+
+/* --- Agente de IA (AgenteIA.tsx) ----------------------------------------- */
+
+.ai-bar {
+  position: relative;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.12);
+}
+
+.ai-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(192 175 251 / 0.9), transparent);
+  transform: translateX(-100%);
+  animation: ai-shimmer 1100ms ease-in-out infinite;
+}
+
+@keyframes ai-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.ai-insight {
+  animation: hero-in 520ms var(--ease-out) both;
+}
+
+/* --- Segmentos: hover (só com hover real) -------------------------------- */
+
+.segment-card {
+  transition:
+    transform 320ms var(--ease-out),
+    box-shadow 320ms var(--ease-out),
+    border-color 320ms,
+    background-color 320ms;
+}
+
+.segment-icon {
+  transition: transform 320ms var(--ease-out);
+}
+
+@media (hover: hover) {
+  .segment-card:hover {
+    transform: translateY(-4px);
+    box-shadow:
+      0 16px 32px -14px rgb(109 60 224 / 0.35),
+      0 0 0 1px rgb(192 175 251 / 0.55);
+  }
+
+  .segment-card:hover .segment-icon {
+    transform: scale(1.12);
+  }
+}
+
+/* --- Tilt discreto (TiltCard.tsx — kit físico) --------------------------- */
+
+.tilt-card {
+  transform: perspective(1000px) rotateX(var(--trx, 0deg)) rotateY(var(--try, 0deg));
+  transition: transform 480ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+/* --- Preço: destaque suave ao entrar (Planos.tsx) ------------------------ */
+
+.price-card {
+  transition:
+    opacity 700ms var(--ease-out),
+    transform 900ms var(--ease-out),
+    box-shadow 900ms var(--ease-out);
+}
+
+.price-card[data-inview] {
+  transform: translateY(-4px);
+  box-shadow:
+    0 32px 64px -30px rgb(109 60 224 / 0.45),
+    0 0 0 1px rgb(192 175 251 / 0.5);
+}
+
+/* --- CTAs: brilho, clique e magnetismo (Button.tsx) ---------------------- */
+
+.btn-cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 200ms,
+    box-shadow 200ms;
+}
+
+.btn-cta:active {
+  transform: scale(0.97);
+}
+
+.btn-cta__inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transform: translate3d(var(--bx, 0px), var(--by, 0px), 0);
+  transition: transform 220ms var(--ease-out);
+}
+
+.btn-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 32%, var(--shine, rgb(255 255 255 / 0.22)) 50%, transparent 68%);
+  transform: translateX(-130%);
+  transition: transform 700ms ease;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .btn-cta:hover::after {
+    transform: translateX(130%);
+  }
+}
+
+/* --- Header compacto ao rolar -------------------------------------------- */
+
+.site-header {
+  transition:
+    background-color 300ms,
+    box-shadow 300ms,
+    border-color 300ms;
+}
+
+.site-header__bar {
+  transition: padding 300ms var(--ease-out);
+}
+
+/* ==========================================================================
+   Fidelize Admin — superfícies e microinterações (ETAPA 3.4)
+   ========================================================================== */
+
+/* Sombra de repouso bem suave: separa o card do fundo sem "flutuar". */
+.admin-card {
+  box-shadow:
+    0 1px 2px rgb(30 11 71 / 0.04),
+    0 1px 0 rgb(255 255 255 / 0.6) inset;
+}
+
+/* Entrada da página ao trocar de seção — só opacity/transform, curta. */
+.admin-page {
+  animation: admin-page-in 260ms var(--ease-out) both;
+}
+
+/* Estados vazios: aparecem com um leve reveal, para não "piscar". */
+.admin-reveal {
+  animation: admin-page-in 320ms var(--ease-out) both;
+}
+
+@keyframes admin-page-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-page,
+  .admin-reveal {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   Web Card público (/c/[token]) — microinterações (ETAPA 4.1B)
+   Só opacity/transform/box-shadow, curtas, uma vez. Cor via --accent
+   (definida em WebCard.tsx a partir do branding do estabelecimento).
+   ========================================================================== */
+
+@theme {
+  --animate-card-in: card-in 520ms var(--ease-out) both;
+  --animate-stamp-in: stamp-in 420ms var(--ease-out) both;
+  --animate-reward-glow: reward-glow-accent 1600ms ease-out 1 both;
+
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 10px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes stamp-in {
+    0% {
+      transform: scale(0.6);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.12);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes reward-glow-accent {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #6d3ce0) 0%, transparent);
+    }
+    35% {
+      box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent, #6d3ce0) 22%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #6d3ce0) 0%, transparent);
+    }
+  }
+}
+
+/* ==========================================================================
+   prefers-reduced-motion: nenhum conteúdo depende de animação.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  [data-reveal],
+  [data-reveal-stagger] > *,
+  .card-block,
+  .card-block--hidden,
+  .card-notify--hidden,
+  .hero-in,
+  .hero-in-visual,
+  .ai-insight {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+
+  [data-parallax-layer],
+  .tilt-card,
+  .btn-cta__inner,
+  .price-card[data-inview],
+  .segment-card:hover {
+    transform: none !important;
+  }
+
+  .journey-line--h,
+  .journey-line--v {
+    transform: none !important;
+  }
+
+  .nfc-waves,
+  .journey-line::after,
+  .nfc-pulse::after,
+  .btn-cta::after,
+  .ai-bar::after {
+    display: none;
+  }
+}
