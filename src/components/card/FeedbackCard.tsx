@@ -116,9 +116,15 @@ export function FeedbackCard({ token }: { token: string }) {
               type="button"
               role="radio"
               aria-checked={rating === value}
-              aria-label={`${value} de 5`}
+              aria-label={
+                rating === value
+                  ? `${value} de 5 — tocar de novo para limpar`
+                  : `${value} de 5`
+              }
               onClick={() => {
-                setRating(value);
+                // Tocar de novo na nota já selecionada limpa a seleção
+                // (volta a 0) — com rating 0 o envio continua bloqueado.
+                setRating((current) => (current === value ? 0 : value));
                 setOutcome("idle");
               }}
               onMouseEnter={() => setHoverRating(value)}
