@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       audit_logs: {
@@ -296,8 +321,12 @@ export type Database = {
           granted_at: string | null
           id: string
           organization_id: string
+          purpose: string | null
           revoked_at: string | null
+          source: string | null
+          source_ref: string | null
           status: string
+          term_version: string | null
         }
         Insert: {
           consent_type: string
@@ -306,8 +335,12 @@ export type Database = {
           granted_at?: string | null
           id?: string
           organization_id: string
+          purpose?: string | null
           revoked_at?: string | null
+          source?: string | null
+          source_ref?: string | null
           status?: string
+          term_version?: string | null
         }
         Update: {
           consent_type?: string
@@ -316,8 +349,12 @@ export type Database = {
           granted_at?: string | null
           id?: string
           organization_id?: string
+          purpose?: string | null
           revoked_at?: string | null
+          source?: string | null
+          source_ref?: string | null
           status?: string
+          term_version?: string | null
         }
         Relationships: [
           {
@@ -465,6 +502,7 @@ export type Database = {
           email: string | null
           id: string
           name: string
+          organization_id: string
           phone: string | null
           updated_at: string
         }
@@ -474,6 +512,7 @@ export type Database = {
           email?: string | null
           id?: string
           name: string
+          organization_id: string
           phone?: string | null
           updated_at?: string
         }
@@ -483,10 +522,78 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string
+          organization_id?: string
           phone?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enrollment_events: {
+        Row: {
+          created_at: string
+          id: string
+          join_link_id: string | null
+          membership_id: string | null
+          organization_id: string
+          program_id: string
+          was_new_customer: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          join_link_id?: string | null
+          membership_id?: string | null
+          organization_id: string
+          program_id: string
+          was_new_customer: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          join_link_id?: string | null
+          membership_id?: string | null
+          organization_id?: string
+          program_id?: string
+          was_new_customer?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollment_events_join_link_id_fkey"
+            columns: ["join_link_id"]
+            isOneToOne: false
+            referencedRelation: "program_join_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_events_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "customer_memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_events_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_programs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       feedback_categories: {
         Row: {
@@ -992,6 +1099,67 @@ export type Database = {
           },
         ]
       }
+      program_join_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          label: string | null
+          location_id: string | null
+          organization_id: string
+          program_id: string
+          status: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          label?: string | null
+          location_id?: string | null
+          organization_id: string
+          program_id: string
+          status?: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          label?: string | null
+          location_id?: string | null
+          organization_id?: string
+          program_id?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_join_links_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_join_links_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_join_links_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       qr_tokens: {
         Row: {
           created_at: string
@@ -1317,9 +1485,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      enroll_customer: {
+        Args: {
+          p_email?: string
+          p_name: string
+          p_opt_in_email?: boolean
+          p_opt_in_whatsapp?: boolean
+          p_phone: string
+          p_token: string
+        }
+        Returns: Json
+      }
+      get_program_entry: { Args: { p_token: string }; Returns: Json }
       get_public_card: { Args: { p_token: string }; Returns: Json }
       is_org_member: { Args: { org_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      normalize_br_phone: { Args: { p_raw: string }; Returns: string }
       org_role: { Args: { org_id: string }; Returns: string }
       submit_card_feedback: {
         Args: { p_comment?: string; p_rating: number; p_token: string }
@@ -1453,6 +1634,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
