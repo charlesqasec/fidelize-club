@@ -1485,6 +1485,47 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_create_location: {
+        Args: {
+          p_address?: Json
+          p_name: string
+          p_organization_id: string
+          p_slug: string
+        }
+        Returns: Json
+      }
+      admin_org_actor_role: {
+        Args: { p_organization_id: string }
+        Returns: string
+      }
+      admin_set_location_status: {
+        Args: { p_location_id: string; p_status: string }
+        Returns: Json
+      }
+      admin_update_feature_flags: {
+        Args: {
+          p_apple_wallet_enabled?: boolean
+          p_google_wallet_enabled?: boolean
+          p_internal_feedback_enabled?: boolean
+          p_organization_id: string
+          p_reviews_enabled?: boolean
+          p_web_push_enabled?: boolean
+        }
+        Returns: Json
+      }
+      admin_update_location: {
+        Args: {
+          p_address?: Json
+          p_location_id: string
+          p_name?: string
+          p_slug?: string
+        }
+        Returns: Json
+      }
+      admin_update_organization: {
+        Args: { p_name: string; p_organization_id: string }
+        Returns: Json
+      }
       enroll_customer: {
         Args: {
           p_email?: string
