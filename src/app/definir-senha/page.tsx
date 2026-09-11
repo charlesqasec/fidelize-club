@@ -16,14 +16,36 @@ import {
  * convite (`auth.admin.inviteUserByEmail(email, { redirectTo:
  * ".../definir-senha" })`, `src/lib/admin/team-panel/actions.ts`).
  *
- * O link traz o token na fragment da URL (`#access_token=...`), que nunca
- * chega ao servidor (fragments não são enviados em requisições HTTP) — só o
- * client do navegador o processa. O client Supabase de
- * `src/lib/supabase/client.ts` troca esse token por uma sessão temporária
- * sozinho ao carregar a página (`detectSessionInUrl`, padrão do
- * `@supabase/ssr`/`supabase-js`). Esta página só espera essa sessão existir
- * e chama `supabase.auth.updateUser({ password })` — nunca lê, gera nem
- * armazena senha em nenhum outro lugar do app.
+ * O convite do Auth Admin API é um redirect implicit-grant clássico: o
+ * GoTrue valida o token no `/verify` e devolve a sessão na fragment da URL
+ * (`#access_token=...&refresh_token=...&type=invite`) — nunca chega ao
+ * servidor (fragments não são enviados em requisições HTTP), só o
+ * navegador o vê.
+ *
+ * `createBrowserClient` (`@supabase/ssr`) fixa `flowType: "pkce"` sempre —
+ * não dá para configurar `implicit` por fora (`node_modules/@supabase/ssr/
+ * dist/main/createBrowserClient.js`). Com isso, a detecção automática de
+ * sessão na URL (`detectSessionInUrl`) roda no `_initialize()` do client,
+ * reconhece a fragment como um callback implicit, mas rejeita: como o
+ * `flowType` do client é `pkce`, `_getSessionFromURL` lança
+ * `AuthPKCEGrantCodeExchangeError` só por causa do descompasso de flow —
+ * sem nunca chegar a ler `access_token`/`refresh_token`
+ * (`@supabase/auth-js/dist/main/GoTrueClient.js`, método `_getSessionFromURL`).
+ * O erro é engolido silenciosamente dentro de `_initialize()`, então
+ * `getSession()` simplesmente devolve `session: null` — daí o "Link
+ * inválido ou expirado" mesmo com o redirect correto.
+ *
+ * Esse throw acontece ANTES do trecho que limpa `window.location.hash`, ou
+ * seja, a fragment sobrevive intacta no `window.location.hash` mesmo depois
+ * da tentativa automática falhar. Por isso, ao montar, esta página lê a
+ * fragment manualmente e chama `supabase.auth.setSession({ access_token,
+ * refresh_token })` — que não depende de `flowType` nem de PKCE verifier,
+ * só valida o par de tokens direto com o Auth server e persiste a sessão
+ * pelo mesmo storage baseado em cookies do `createBrowserClient` (nenhum
+ * client/fluxo de auth novo, só o fallback manual do que o
+ * `detectSessionInUrl` automático não completa neste caso). Depois disso a
+ * página chama `supabase.auth.updateUser({ password })` — nunca lê, gera
+ * nem armazena senha em nenhum outro lugar do app.
  */
 export default function DefinirSenhaPage() {
   const router = useRouter();
@@ -36,11 +58,52 @@ export default function DefinirSenhaPage() {
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => {
-      setHasSession(Boolean(data.session));
-      setChecking(false);
-    });
+
+    async function resolveInviteSession() {
+      const { data: existing } = await supabase.auth.getSession();
+      if (existing.session) {
+        if (!cancelled) {
+          setHasSession(true);
+          setChecking(false);
+        }
+        return;
+      }
+
+      const rawHash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      const hashParams = new URLSearchParams(rawHash);
+      const access_token = hashParams.get("access_token");
+      const refresh_token = hashParams.get("refresh_token");
+
+      let sessionEstablished = false;
+      if (access_token && refresh_token) {
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        });
+        if (!setSessionError) {
+          sessionEstablished = true;
+          window.history.replaceState(
+            window.history.state,
+            "",
+            window.location.pathname,
+          );
+        }
+      }
+
+      if (!cancelled) {
+        setHasSession(sessionEstablished);
+        setChecking(false);
+      }
+    }
+
+    resolveInviteSession();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleSubmit(event: React.FormEvent) {
@@ -83,7 +146,7 @@ export default function DefinirSenhaPage() {
           Definir senha
         </h1>
         <p className="mt-1 text-center text-sm text-ink-muted">
-          Escolha a senha de acesso ao Fidelize Admin.
+          Escolha sua senha de acesso ao Fidelize.club.
         </p>
 
         {checking ? (
