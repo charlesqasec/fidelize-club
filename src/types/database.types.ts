@@ -1485,6 +1485,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_add_member: {
+        Args: { p_organization_id: string; p_role: string; p_user_id: string }
+        Returns: Json
+      }
       admin_create_location: {
         Args: {
           p_address?: Json
@@ -1512,6 +1516,14 @@ export type Database = {
         Args: { p_location_id: string; p_status: string }
         Returns: Json
       }
+      admin_set_member_status: {
+        Args: {
+          p_member_id: string
+          p_organization_id: string
+          p_status: string
+        }
+        Returns: Json
+      }
       admin_set_reward_status: {
         Args: { p_reward_id: string; p_status: string }
         Returns: Json
@@ -1534,6 +1546,10 @@ export type Database = {
           p_name?: string
           p_slug?: string
         }
+        Returns: Json
+      }
+      admin_update_member_role: {
+        Args: { p_member_id: string; p_organization_id: string; p_role: string }
         Returns: Json
       }
       admin_update_organization: {

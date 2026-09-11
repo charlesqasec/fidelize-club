@@ -33,6 +33,13 @@ const REASON_MESSAGE: Record<string, string> = {
   invalid_description: "A descrição deve ter no máximo 500 caracteres.",
   invalid_reward_type: "Tipo de recompensa inválido.",
   invalid_threshold: "Meta da recompensa inválida.",
+  invalid_email: "Informe um e-mail válido.",
+  invalid_role: "Papel inválido.",
+  already_member: "Essa pessoa já faz parte da equipe deste estabelecimento.",
+  last_owner:
+    "Não é possível remover o único proprietário ativo do estabelecimento.",
+  invite_failed:
+    "Não foi possível enviar o convite. Confira o e-mail e tente novamente.",
   slug_taken: "Já existe uma unidade com esse identificador.",
   no_changes: "Nenhuma alteração para salvar.",
   network:

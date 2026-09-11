@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Badge } from "@/components/admin/Badge";
-import { DataTable } from "@/components/admin/DataTable";
 import { InlineEmpty, SectionCard } from "@/components/admin/SectionCard";
 import {
   FeatureFlagsSection,
@@ -13,7 +12,11 @@ import {
   type LocationRow,
 } from "@/components/admin/org-settings/LocationsManager";
 import { OrganizationSection } from "@/components/admin/org-settings/OrganizationSection";
-import { formatAddress, formatDate, shortId } from "@/lib/admin/format";
+import {
+  TeamManager,
+  type MemberRow,
+} from "@/components/admin/team-panel/TeamManager";
+import { formatAddress, formatDate } from "@/lib/admin/format";
 import { requireOrgAccess } from "@/lib/admin/org-access";
 import { orgRoleLabel, statusView } from "@/lib/admin/status";
 import {
@@ -29,11 +32,11 @@ export const metadata: Metadata = {
 };
 
 /**
- * Configurações do PAINEL DO ESTABELECIMENTO (ETAPA 4.6B / bloco 1).
- * Leitura como antes; escrita de organização, canais e unidades conforme o
- * papel do usuário:
+ * Configurações do PAINEL DO ESTABELECIMENTO (ETAPA 4.6B / bloco 1, ETAPA
+ * 4.6D para Equipe). Leitura como antes; escrita de organização, canais,
+ * unidades e equipe conforme o papel do usuário:
  *
- *   PLATFORM_ADMIN / OWNER -> organização, canais e unidades
+ *   PLATFORM_ADMIN / OWNER -> organização, canais, unidades e equipe
  *   MANAGER                -> apenas unidades
  *   STAFF                  -> somente leitura
  *
@@ -42,8 +45,11 @@ export const metadata: Metadata = {
  * validam `auth.uid()`, `organization_id` e papel dentro da operação e
  * registram `audit_logs`.
  *
- * Equipe (`organization_members`) segue somente leitura — gestão de equipe
- * está fora deste bloco.
+ * Nome/e-mail dos membros vêm de `profiles`, buscado à parte (sem FK
+ * PostgREST-embutível de `organization_members` para `profiles` — a FK real
+ * é para `auth.users`) e visível graças à policy `profiles_select_org_mates`
+ * (20260911150000): quem compartilha uma organização ativa enxerga o perfil
+ * de quem também compartilha.
  */
 export default async function OrganizationConfiguracoesPage({
   params,
@@ -83,10 +89,28 @@ export default async function OrganizationConfiguracoesPage({
   const flags = flagsResult.data;
   const orgStatus = statusView.organization(organization?.status);
 
+  const memberUserIds = members.map((member) => member.user_id);
+  const profilesResult =
+    memberUserIds.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", memberUserIds)
+      : { data: [] as { id: string; full_name: string | null; email: string | null }[] };
+  const profileById = new Map(
+    (profilesResult.data ?? []).map((profile) => [profile.id, profile]),
+  );
+
   const role = access.viewerRole;
   const canEditOrg = role === "PLATFORM_ADMIN" || role === "OWNER";
   const canEditLocations =
     role === "PLATFORM_ADMIN" || role === "OWNER" || role === "MANAGER";
+  const assignableMemberRoles: ("OWNER" | "MANAGER" | "STAFF")[] =
+    role === "PLATFORM_ADMIN"
+      ? ["OWNER", "MANAGER", "STAFF"]
+      : role === "OWNER"
+        ? ["MANAGER", "STAFF"]
+        : [];
 
   const accessLabel =
     role === "PLATFORM_ADMIN"
@@ -108,6 +132,15 @@ export default async function OrganizationConfiguracoesPage({
     slug: location.slug,
     status: location.status,
     addressLabel: formatAddress(location.address),
+  }));
+
+  const memberRows: MemberRow[] = members.map((member) => ({
+    id: member.id,
+    role: member.role,
+    status: member.status,
+    createdAtLabel: formatDate(member.created_at),
+    name: profileById.get(member.user_id)?.full_name ?? null,
+    email: profileById.get(member.user_id)?.email ?? null,
   }));
 
   return (
@@ -163,75 +196,13 @@ export default async function OrganizationConfiguracoesPage({
         title="Equipe"
         description="Pessoas com acesso a este estabelecimento e o papel de cada uma."
         icon={<IconUsers className="h-5 w-5" />}
-        flush={members.length > 0}
-        footer={
-          members.length > 0
-            ? "Nome e e-mail dos membros não são exibidos nesta etapa — apenas papel e situação. Gestão de equipe é um próximo bloco."
-            : undefined
-        }
       >
-        {members.length === 0 ? (
-          <InlineEmpty icon={<IconUsers className="h-4 w-4" />}>
-            Nenhum membro vinculado ainda.
-          </InlineEmpty>
-        ) : (
-          <DataTable
-            caption="Membros da equipe do estabelecimento"
-            rows={members}
-            rowKey={(member) => member.id}
-            minWidth={560}
-            columns={[
-              {
-                id: "user",
-                header: "Usuário",
-                mobile: "title",
-                cell: (member) => (
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span
-                      aria-hidden="true"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-800"
-                    >
-                      {orgRoleLabel(member.role).charAt(0)}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-medium text-brand-950">
-                        {orgRoleLabel(member.role)}
-                      </p>
-                      <p className="mt-0.5 font-mono text-xs text-ink-muted">
-                        {shortId(member.user_id)}…
-                      </p>
-                    </div>
-                  </div>
-                ),
-              },
-              {
-                id: "role",
-                header: "Papel",
-                mobile: "hidden",
-                cell: (member) => orgRoleLabel(member.role),
-              },
-              {
-                id: "since",
-                header: "Desde",
-                className: "whitespace-nowrap text-ink-soft",
-                cell: (member) => formatDate(member.created_at),
-              },
-              {
-                id: "status",
-                header: "Status",
-                mobile: "badge",
-                cell: (member) => {
-                  const view = statusView.member(member.status);
-                  return (
-                    <Badge tone={view.tone} dot={member.status === "ACTIVE"}>
-                      {view.label}
-                    </Badge>
-                  );
-                },
-              },
-            ]}
-          />
-        )}
+        <TeamManager
+          organizationId={organizationId}
+          members={memberRows}
+          canManage={canEditOrg}
+          assignableRoles={assignableMemberRoles}
+        />
       </SectionCard>
 
       <SectionCard
