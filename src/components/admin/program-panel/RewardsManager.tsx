@@ -5,12 +5,12 @@ import { useState, useTransition } from "react";
 import { Badge } from "@/components/admin/Badge";
 import { InlineEmpty } from "@/components/admin/SectionCard";
 import {
-  createLocation,
-  setLocationStatus,
-  updateLocation,
-} from "@/lib/admin/org-settings/actions";
-import { statusView } from "@/lib/admin/status";
-import { IconMapPin } from "@/components/ui/Icons";
+  createReward,
+  setRewardStatus,
+  updateReward,
+} from "@/lib/admin/program-panel/actions";
+import { rewardTypeLabel, statusView } from "@/lib/admin/status";
+import { IconGift } from "@/components/ui/Icons";
 
 import {
   FormFeedback,
@@ -19,36 +19,32 @@ import {
   inputClass,
 } from "@/components/admin/formKit";
 
-export type LocationRow = {
+const REWARD_TYPES = ["FREE_ITEM", "DISCOUNT", "CASHBACK", "CUSTOM"] as const;
+
+export type RewardRow = {
   id: string;
   name: string;
-  slug: string;
+  description: string | null;
+  reward_type: string;
+  threshold: number;
   status: string;
-  addressLabel: string;
 };
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
-
 /**
- * Corpo do card "Unidades". Leitura para todos; criar / editar / ativar /
- * desativar para OWNER, MANAGER e platform admin (`canEdit`). A RPC
- * (`admin_create_location` / `admin_update_location` /
- * `admin_set_location_status`) é a autoridade de RBAC e registra
- * `audit_logs`.
+ * Corpo do card "Recompensas". Leitura para todos; criar / editar / ativar
+ * / desativar para OWNER e platform admin (`canEdit`). As RPCs
+ * `admin_create_reward` / `admin_update_reward` / `admin_set_reward_status`
+ * são a autoridade de RBAC e registram `audit_logs`.
  */
-export function LocationsManager({
+export function RewardsManager({
   organizationId,
-  locations,
+  programId,
+  rewards,
   canEdit,
 }: {
   organizationId: string;
-  locations: LocationRow[];
+  programId: string;
+  rewards: RewardRow[];
   canEdit: boolean;
 }) {
   const [creating, setCreating] = useState(false);
@@ -70,19 +66,19 @@ export function LocationsManager({
 
   return (
     <div>
-      {locations.length === 0 && !creating ? (
-        <InlineEmpty icon={<IconMapPin className="h-4 w-4" />}>
-          Nenhuma unidade cadastrada ainda.
+      {rewards.length === 0 && !creating ? (
+        <InlineEmpty icon={<IconGift className="h-4 w-4" />}>
+          Nenhuma recompensa cadastrada para este programa.
         </InlineEmpty>
       ) : (
         <ul className="divide-y divide-line rounded-xl border border-line">
-          {locations.map((location) =>
-            editingId === location.id ? (
-              <li key={location.id} className="p-4">
-                <LocationForm
+          {rewards.map((reward) =>
+            editingId === reward.id ? (
+              <li key={reward.id} className="p-4">
+                <RewardForm
                   submitLabel="Salvar"
                   pending={pending}
-                  initial={location}
+                  initial={reward}
                   onCancel={() => {
                     setEditingId(null);
                     setError(null);
@@ -90,14 +86,13 @@ export function LocationsManager({
                   onSubmit={(values) =>
                     run(
                       () =>
-                        updateLocation({
+                        updateReward({
                           organizationId,
-                          locationId: location.id,
+                          rewardId: reward.id,
                           name: values.name,
-                          slug: values.slug,
-                          address: values.address
-                            ? { linha: values.address }
-                            : null,
+                          description: values.description,
+                          rewardType: values.rewardType,
+                          threshold: values.threshold,
                         }),
                       () => setEditingId(null),
                     )
@@ -106,31 +101,34 @@ export function LocationsManager({
               </li>
             ) : (
               <li
-                key={location.id}
+                key={reward.id}
                 className="flex flex-wrap items-start justify-between gap-3 p-4"
               >
                 <div className="min-w-0">
-                  <p className="font-medium text-brand-950">{location.name}</p>
-                  <p className="mt-0.5 font-mono text-xs text-ink-muted">
-                    {location.slug}
-                  </p>
+                  <p className="font-medium text-brand-950">{reward.name}</p>
+                  {reward.description ? (
+                    <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+                      {reward.description}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs text-ink-soft">
-                    {location.addressLabel}
+                    {rewardTypeLabel(reward.reward_type)} · meta{" "}
+                    {reward.threshold}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <Badge
-                    tone={statusView.location(location.status).tone}
-                    dot={location.status === "ACTIVE"}
+                    tone={statusView.program(reward.status).tone}
+                    dot={reward.status === "ACTIVE"}
                   >
-                    {statusView.location(location.status).label}
+                    {statusView.program(reward.status).label}
                   </Badge>
                   {canEdit ? (
                     <>
                       <GhostButton
                         disabled={pending}
                         onClick={() => {
-                          setEditingId(location.id);
+                          setEditingId(reward.id);
                           setCreating(false);
                           setError(null);
                         }}
@@ -142,19 +140,17 @@ export function LocationsManager({
                         onClick={() =>
                           run(
                             () =>
-                              setLocationStatus({
+                              setRewardStatus({
                                 organizationId,
-                                locationId: location.id,
+                                rewardId: reward.id,
                                 status:
-                                  location.status === "ACTIVE"
-                                    ? "INACTIVE"
-                                    : "ACTIVE",
+                                  reward.status === "ACTIVE" ? "PAUSED" : "ACTIVE",
                               }),
                             () => {},
                           )
                         }
                       >
-                        {location.status === "ACTIVE" ? "Desativar" : "Ativar"}
+                        {reward.status === "ACTIVE" ? "Desativar" : "Ativar"}
                       </GhostButton>
                     </>
                   ) : null}
@@ -169,8 +165,8 @@ export function LocationsManager({
         <div className="mt-4">
           {creating ? (
             <div className="rounded-xl border border-line p-4">
-              <LocationForm
-                submitLabel="Criar unidade"
+              <RewardForm
+                submitLabel="Criar recompensa"
                 pending={pending}
                 onCancel={() => {
                   setCreating(false);
@@ -179,13 +175,13 @@ export function LocationsManager({
                 onSubmit={(values) =>
                   run(
                     () =>
-                      createLocation({
+                      createReward({
                         organizationId,
+                        programId,
                         name: values.name,
-                        slug: values.slug,
-                        address: values.address
-                          ? { linha: values.address }
-                          : null,
+                        description: values.description,
+                        rewardType: values.rewardType,
+                        threshold: values.threshold,
                       }),
                     () => setCreating(false),
                   )
@@ -202,7 +198,7 @@ export function LocationsManager({
                 setError(null);
               }}
             >
-              Nova unidade
+              Nova recompensa
             </PrimaryButton>
           )}
         </div>
@@ -213,41 +209,51 @@ export function LocationsManager({
   );
 }
 
-function LocationForm({
+function RewardForm({
   initial,
   submitLabel,
   pending,
   onSubmit,
   onCancel,
 }: {
-  initial?: LocationRow;
+  initial?: RewardRow;
   submitLabel: string;
   pending: boolean;
-  onSubmit: (values: { name: string; slug: string; address: string }) => void;
+  onSubmit: (values: {
+    name: string;
+    description: string | null;
+    rewardType: (typeof REWARD_TYPES)[number];
+    threshold: number;
+  }) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [slug, setSlug] = useState(initial?.slug ?? "");
-  const [slugTouched, setSlugTouched] = useState(Boolean(initial));
-  const [address, setAddress] = useState(
-    initial && initial.addressLabel !== "—" ? initial.addressLabel : "",
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [rewardType, setRewardType] = useState<(typeof REWARD_TYPES)[number]>(
+    (initial?.reward_type as (typeof REWARD_TYPES)[number]) ?? "FREE_ITEM",
   );
+  const [threshold, setThreshold] = useState(String(initial?.threshold ?? 0));
 
-  const effectiveSlug = slugTouched ? slug : slugify(name);
-  const slugValid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(effectiveSlug);
+  const thresholdValue = Number(threshold);
+  const thresholdValid = Number.isFinite(thresholdValue) && thresholdValue >= 0;
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ name: name.trim(), slug: effectiveSlug, address: address.trim() });
+        onSubmit({
+          name: name.trim(),
+          description: description.trim() === "" ? null : description.trim(),
+          rewardType,
+          threshold: thresholdValue,
+        });
       }}
       noValidate
       className="grid gap-3 sm:grid-cols-2"
     >
       <div>
         <label className="block text-sm font-medium text-brand-950">
-          Nome da unidade
+          Nome da recompensa
           <input
             type="text"
             value={name}
@@ -260,40 +266,56 @@ function LocationForm({
       </div>
       <div>
         <label className="block text-sm font-medium text-brand-950">
-          Identificador (slug)
-          <input
-            type="text"
-            value={effectiveSlug}
+          Tipo
+          <select
+            value={rewardType}
             disabled={pending}
-            onChange={(e) => {
-              setSlugTouched(true);
-              setSlug(e.target.value);
-            }}
+            onChange={(e) =>
+              setRewardType(e.target.value as (typeof REWARD_TYPES)[number])
+            }
+            className={inputClass}
+          >
+            {REWARD_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {rewardTypeLabel(type)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-brand-950">
+          Meta{" "}
+          <span className="font-normal text-ink-muted">
+            (pontos/selos/visitas necessários)
+          </span>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={threshold}
+            disabled={pending}
+            onChange={(e) => setThreshold(e.target.value)}
             className={inputClass}
           />
         </label>
-        {!slugValid && effectiveSlug.length > 0 ? (
-          <p className="mt-1 text-xs text-red-700">
-            Só letras minúsculas, números e hífens.
-          </p>
-        ) : null}
       </div>
       <div className="sm:col-span-2">
         <label className="block text-sm font-medium text-brand-950">
-          Endereço{" "}
+          Descrição{" "}
           <span className="font-normal text-ink-muted">(opcional)</span>
           <input
             type="text"
-            value={address}
+            value={description}
             disabled={pending}
-            onChange={(e) => setAddress(e.target.value)}
+            onChange={(e) => setDescription(e.target.value)}
             className={inputClass}
           />
         </label>
       </div>
       <div className="flex items-center gap-1 sm:col-span-2">
         <PrimaryButton
-          disabled={pending || name.trim().length < 2 || !slugValid}
+          disabled={pending || name.trim().length < 2 || !thresholdValid}
         >
           {pending ? "Salvando…" : submitLabel}
         </PrimaryButton>

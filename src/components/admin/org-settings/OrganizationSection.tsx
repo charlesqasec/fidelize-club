@@ -11,7 +11,7 @@ import {
   GhostButton,
   PrimaryButton,
   inputClass,
-} from "./formKit";
+} from "@/components/admin/formKit";
 
 /**
  * Corpo do card "Estabelecimento" — leitura por padrão, edição do nome para

@@ -2,67 +2,31 @@ import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Badge } from "@/components/admin/Badge";
-import { DataTable } from "@/components/admin/DataTable";
 import { EmptyState } from "@/components/admin/EmptyState";
 import { ProgramCardPreview } from "@/components/admin/ProgramCardPreview";
-import {
-  DefinitionList,
-  InlineEmpty,
-  SectionCard,
-} from "@/components/admin/SectionCard";
-import { formatNumber, jsonEntries, jsonNumber } from "@/lib/admin/format";
+import { SectionCard } from "@/components/admin/SectionCard";
+import { BrandingSection } from "@/components/admin/program-panel/BrandingSection";
+import { ProgramSection } from "@/components/admin/program-panel/ProgramSection";
+import { RewardsManager } from "@/components/admin/program-panel/RewardsManager";
+import { jsonNumber } from "@/lib/admin/format";
 import { requireOrgAccess } from "@/lib/admin/org-access";
-import {
-  cardStyleLabel,
-  programTypeLabel,
-  rewardTypeLabel,
-  ruleKeyLabel,
-  statusView,
-} from "@/lib/admin/status";
-import {
-  IconGift,
-  IconMapPin,
-  IconPalette,
-  IconRepeat,
-  IconWrench,
-} from "@/components/ui/Icons";
+import { programTypeLabel } from "@/lib/admin/status";
+import { IconGift, IconPalette, IconRepeat } from "@/components/ui/Icons";
 
 export const metadata: Metadata = {
   title: "Programa",
   robots: { index: false, follow: false },
 };
 
-function ColorTile({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-line bg-white p-2.5">
-      <span
-        aria-hidden="true"
-        className="h-10 w-10 shrink-0 rounded-lg ring-1 ring-inset ring-black/10"
-        style={{
-          backgroundColor: value ?? undefined,
-          backgroundImage: value
-            ? undefined
-            : "repeating-linear-gradient(45deg, #ece7fe 0 6px, #ffffff 6px 12px)",
-        }}
-      />
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-          {label}
-        </p>
-        <p className="mt-0.5 truncate font-mono text-sm text-brand-950">
-          {value ?? "Não definida"}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 /**
- * Programa de fidelidade — somente leitura nesta etapa. Mostra a mecânica,
- * o branding e o catálogo de recompensas reais (RLS: membro da organização
- * ou platform_admin). Nenhuma escrita: as tabelas não têm policy de
- * INSERT/UPDATE para `authenticated`, então ajuste real fica para a etapa
- * do painel de negócio.
+ * Programa de fidelidade — PAINEL DO ESTABELECIMENTO (ETAPA 4.6C). Leitura
+ * para todos os papéis; edição de programa (nome/status/regras
+ * whitelisted), identidade visual e recompensas para OWNER / platform
+ * admin (`canEdit`). `type` do programa nunca é editável (decisão da
+ * ETAPA 4.6C). A UI só decide o que OFERECE — a autoridade de RBAC é o
+ * servidor: as Server Actions revalidam o acesso e as RPCs `admin_*`
+ * (SECURITY DEFINER) validam `auth.uid()`, `organization_id` e papel
+ * dentro da operação, e registram `audit_logs`.
  */
 export default async function ProgramaPage({
   params,
@@ -71,6 +35,9 @@ export default async function ProgramaPage({
 }) {
   const { organizationId } = await params;
   const { supabase, access } = await requireOrgAccess(organizationId);
+
+  const role = access.viewerRole;
+  const canEdit = role === "PLATFORM_ADMIN" || role === "OWNER";
 
   const { data: programs } = await supabase
     .from("loyalty_programs")
@@ -113,13 +80,13 @@ export default async function ProgramaPage({
         eyebrow="Fidelidade"
         title="Programa"
         description="Configuração atual do programa de fidelidade deste estabelecimento."
-        actions={<Badge tone="brand">Somente leitura</Badge>}
+        actions={
+          !canEdit ? <Badge tone="brand">Somente leitura</Badge> : undefined
+        }
       />
 
       {programList.map((program) => {
-        const view = statusView.program(program.status);
-        const branding = program.branding;
-        const rules = jsonEntries(program.rules);
+        const rules = (program.rules ?? {}) as Record<string, unknown>;
         const target = jsonNumber(program.rules, [
           "target",
           "stamps_target",
@@ -130,6 +97,7 @@ export default async function ProgramaPage({
           (reward) => reward.program_id === program.id,
         );
         const firstReward = programRewards[0] ?? null;
+        const branding = program.branding;
 
         return (
           <article
@@ -141,52 +109,20 @@ export default async function ProgramaPage({
             <section className="admin-card overflow-hidden rounded-2xl border border-line bg-white">
               <div className="grid grid-cols-1 lg:grid-cols-5">
                 <div className="p-5 sm:p-6 lg:col-span-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge tone={view.tone} dot={program.status === "ACTIVE"} size="md">
-                      {view.label}
-                    </Badge>
-                    <Badge tone="neutral" size="md">
-                      {programTypeLabel(program.type)}
-                    </Badge>
-                  </div>
-                  <h2
-                    id={`program-${program.id}`}
-                    className="mt-3 font-display text-xl font-bold tracking-tight text-brand-950 sm:text-2xl"
-                  >
-                    {program.name}
-                  </h2>
-                  <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
-                    <IconMapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {program.location?.name ?? "Vale para todas as unidades"}
-                  </p>
-
-                  <div className="mt-6">
-                    <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                      <IconWrench className="h-3.5 w-3.5" aria-hidden="true" />
-                      Regras da mecânica
-                    </h3>
-                    {rules.length === 0 ? (
-                      <p className="mt-2 text-sm text-ink-muted">
-                        Sem parâmetros configurados para esta mecânica.
-                      </p>
-                    ) : (
-                      <dl className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {rules.map(([key, value]) => (
-                          <div
-                            key={key}
-                            className="flex items-baseline justify-between gap-3 rounded-xl bg-surface-soft px-3.5 py-2.5"
-                          >
-                            <dt className="text-sm text-ink-soft">
-                              {ruleKeyLabel(key)}
-                            </dt>
-                            <dd className="max-w-[60%] truncate text-right font-mono text-sm font-semibold tabular-nums text-brand-950">
-                              {value}
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    )}
-                  </div>
+                  <ProgramSection
+                    organizationId={organizationId}
+                    program={{
+                      id: program.id,
+                      name: program.name,
+                      status: program.status,
+                      type: program.type,
+                      rules,
+                    }}
+                    locationLabel={
+                      program.location?.name ?? "Vale para todas as unidades"
+                    }
+                    canEdit={canEdit}
+                  />
                 </div>
 
                 <div className="flex items-center justify-center border-t border-line bg-[radial-gradient(ellipse_at_top,_var(--color-brand-100),_var(--color-surface-soft)_70%)] p-5 sm:p-6 lg:col-span-2 lg:border-l lg:border-t-0">
@@ -216,120 +152,25 @@ export default async function ProgramaPage({
               description="Cores e textos usados no Cartão Digital deste programa."
               icon={<IconPalette className="h-5 w-5" />}
             >
-              {!branding ? (
-                <InlineEmpty icon={<IconPalette className="h-4 w-4" />}>
-                  Nenhuma identidade visual configurada — a prévia acima usa
-                  as cores padrão da Fidelize.
-                </InlineEmpty>
-              ) : (
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <ColorTile label="Primária" value={branding.primary_color} />
-                    <ColorTile label="Secundária" value={branding.secondary_color} />
-                    <ColorTile label="Fundo" value={branding.background_color} />
-                    <ColorTile label="Texto" value={branding.text_color} />
-                  </div>
-                  <DefinitionList
-                    columns={3}
-                    items={[
-                      {
-                        term: "Estilo do cartão",
-                        value: cardStyleLabel(branding.card_style),
-                      },
-                      {
-                        term: "Headline",
-                        value: branding.headline ?? (
-                          <span className="text-ink-muted">Não definida</span>
-                        ),
-                      },
-                      {
-                        term: "Logo",
-                        value: branding.logo_url ? (
-                          <a
-                            href={branding.logo_url}
-                            className="break-all text-brand-700 underline-offset-2 hover:underline"
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Abrir arquivo
-                          </a>
-                        ) : (
-                          <span className="text-ink-muted">Não enviada</span>
-                        ),
-                      },
-                      {
-                        term: "Descrição",
-                        value: branding.description ?? (
-                          <span className="text-ink-muted">Não definida</span>
-                        ),
-                        wide: true,
-                      },
-                    ]}
-                  />
-                </div>
-              )}
+              <BrandingSection
+                organizationId={organizationId}
+                programId={program.id}
+                branding={branding}
+                canEdit={canEdit}
+              />
             </SectionCard>
 
             <SectionCard
               title="Recompensas"
               description="O que o cliente ganha ao atingir cada meta."
               icon={<IconGift className="h-5 w-5" />}
-              flush={programRewards.length > 0}
             >
-              {programRewards.length === 0 ? (
-                <InlineEmpty icon={<IconGift className="h-4 w-4" />}>
-                  Nenhuma recompensa cadastrada para este programa.
-                </InlineEmpty>
-              ) : (
-                <DataTable
-                  caption={`Recompensas do programa ${program.name}`}
-                  rows={programRewards}
-                  rowKey={(reward) => reward.id}
-                  minWidth={560}
-                  columns={[
-                    {
-                      id: "name",
-                      header: "Recompensa",
-                      mobile: "title",
-                      cell: (reward) => (
-                        <div className="min-w-0">
-                          <p className="font-medium text-brand-950">{reward.name}</p>
-                          {reward.description ? (
-                            <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
-                              {reward.description}
-                            </p>
-                          ) : null}
-                        </div>
-                      ),
-                    },
-                    {
-                      id: "type",
-                      header: "Tipo",
-                      cell: (reward) => rewardTypeLabel(reward.reward_type),
-                    },
-                    {
-                      id: "threshold",
-                      header: "Meta",
-                      align: "right",
-                      className: "tabular-nums font-semibold",
-                      cell: (reward) => formatNumber(reward.threshold),
-                    },
-                    {
-                      id: "status",
-                      header: "Status",
-                      mobile: "badge",
-                      cell: (reward) => {
-                        const rewardStatus = statusView.program(reward.status);
-                        return (
-                          <Badge tone={rewardStatus.tone}>
-                            {rewardStatus.label}
-                          </Badge>
-                        );
-                      },
-                    },
-                  ]}
-                />
-              )}
+              <RewardsManager
+                organizationId={organizationId}
+                programId={program.id}
+                rewards={programRewards}
+                canEdit={canEdit}
+              />
             </SectionCard>
           </article>
         );

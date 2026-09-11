@@ -1494,12 +1494,26 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_create_reward: {
+        Args: {
+          p_description?: string
+          p_name: string
+          p_program_id: string
+          p_reward_type: string
+          p_threshold?: number
+        }
+        Returns: Json
+      }
       admin_org_actor_role: {
         Args: { p_organization_id: string }
         Returns: string
       }
       admin_set_location_status: {
         Args: { p_location_id: string; p_status: string }
+        Returns: Json
+      }
+      admin_set_reward_status: {
+        Args: { p_reward_id: string; p_status: string }
         Returns: Json
       }
       admin_update_feature_flags: {
@@ -1524,6 +1538,39 @@ export type Database = {
       }
       admin_update_organization: {
         Args: { p_name: string; p_organization_id: string }
+        Returns: Json
+      }
+      admin_update_program: {
+        Args: {
+          p_name?: string
+          p_program_id: string
+          p_rules?: Json
+          p_status?: string
+        }
+        Returns: Json
+      }
+      admin_update_reward: {
+        Args: {
+          p_description?: string
+          p_name?: string
+          p_reward_id: string
+          p_reward_type?: string
+          p_threshold?: number
+        }
+        Returns: Json
+      }
+      admin_upsert_program_branding: {
+        Args: {
+          p_background_color?: string
+          p_card_style?: string
+          p_description?: string
+          p_headline?: string
+          p_logo_url?: string
+          p_primary_color?: string
+          p_program_id: string
+          p_secondary_color?: string
+          p_text_color?: string
+        }
         Returns: Json
       }
       enroll_customer: {

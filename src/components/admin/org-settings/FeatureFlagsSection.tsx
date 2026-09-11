@@ -6,7 +6,7 @@ import { Badge } from "@/components/admin/Badge";
 import { updateFeatureFlags } from "@/lib/admin/org-settings/actions";
 import { IconCheck, IconX } from "@/components/ui/Icons";
 
-import { FormFeedback, GhostButton, PrimaryButton } from "./formKit";
+import { FormFeedback, GhostButton, PrimaryButton } from "@/components/admin/formKit";
 
 export type OrgFlags = {
   web_card_enabled: boolean;

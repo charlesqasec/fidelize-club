@@ -1,17 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
-import { getAdminContext, resolveOrganizationAccess } from "@/lib/admin/context";
-import { createClient } from "@/lib/supabase/server";
+import { type AdminActionResult, fail, guard, interpret } from "@/lib/admin/rpc";
 
 /**
  * Server Actions de escrita do PAINEL DO ESTABELECIMENTO — bloco 1
  * (organização, feature flags e unidades). ETAPA 4.6B.
  *
  * Cada ação:
- *  1. resolve a sessão (`getAdminContext`) e revalida o acesso à organização
- *     (`resolveOrganizationAccess`) — porta fechada mesmo sem UI;
+ *  1. resolve a sessão e revalida o acesso à organização (`guard`,
+ *     `@/lib/admin/rpc`) — porta fechada mesmo sem UI;
  *  2. delega a ESCRITA para uma RPC `admin_*` `SECURITY DEFINER`
  *     (`20260910150000_establishment_panel_admin_rpcs.sql`), que é a
  *     autoridade final de RBAC: valida `auth.uid()`, `organization_id` e
@@ -24,75 +21,7 @@ import { createClient } from "@/lib/supabase/server";
  * banco.
  */
 
-export type AdminActionResult =
-  | { ok: true; clamped?: string[] }
-  | { ok: false; error: string };
-
-/** Mensagens neutras em pt-BR para as `reason` conhecidas das RPCs. */
-const REASON_MESSAGE: Record<string, string> = {
-  forbidden: "Você não tem permissão para esta ação.",
-  not_found: "Registro não encontrado.",
-  invalid_name: "Confira o nome informado (mínimo 2 caracteres).",
-  invalid_slug:
-    "O identificador deve ter só letras minúsculas, números e hífens (2 a 60 caracteres).",
-  invalid_address: "Endereço em formato inválido.",
-  invalid_status: "Status inválido.",
-  slug_taken: "Já existe uma unidade com esse identificador.",
-  no_changes: "Nenhuma alteração para salvar.",
-  network:
-    "Não foi possível concluir agora. Verifique a conexão e tente novamente.",
-};
-
-function fail(reason: string): { ok: false; error: string } {
-  return { ok: false, error: REASON_MESSAGE[reason] ?? REASON_MESSAGE.network };
-}
-
-type RpcPayload = { ok?: boolean; reason?: string } & Record<string, unknown>;
-
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
-
-type Guarded =
-  | { ok: false; error: string }
-  | { ok: true; supabase: SupabaseServerClient };
-
-/**
- * Guarda comum: sessão + acesso à organização. Retorna o client Supabase
- * (sessão do usuário, sujeito a RLS) ou uma falha já formatada. A RPC
- * `admin_*` ainda revalida tudo server-side — esta checagem é a primeira
- * camada, não a única.
- */
-async function guard(organizationId: string): Promise<Guarded> {
-  if (typeof organizationId !== "string" || organizationId.length === 0) {
-    return fail("not_found");
-  }
-  const supabase = await createClient();
-  const context = await getAdminContext(supabase);
-  if (!context) return fail("forbidden");
-  const access = await resolveOrganizationAccess(
-    supabase,
-    context,
-    organizationId,
-  );
-  if (!access) return fail("forbidden");
-  return { ok: true, supabase };
-}
-
-function interpret(
-  data: unknown,
-  error: unknown,
-  organizationId: string,
-): AdminActionResult {
-  if (error) return fail("network");
-  const payload = (data ?? null) as RpcPayload | null;
-  if (payload?.ok === true) {
-    revalidatePath(`/admin/org/${organizationId}/configuracoes`);
-    const clamped = Array.isArray(payload.clamped)
-      ? payload.clamped.filter((v): v is string => typeof v === "string")
-      : undefined;
-    return clamped && clamped.length > 0 ? { ok: true, clamped } : { ok: true };
-  }
-  return fail(typeof payload?.reason === "string" ? payload.reason : "network");
-}
+export type { AdminActionResult };
 
 // ---------------------------------------------------------------------------
 // Organização
@@ -111,7 +40,7 @@ export async function updateOrganizationName(input: {
     p_organization_id: input.organizationId,
     p_name: name,
   });
-  return interpret(data, error, input.organizationId);
+  return interpret(data, error, [`/admin/org/${input.organizationId}/configuracoes`]);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +71,7 @@ export async function updateFeatureFlags(
     p_google_wallet_enabled: bool(input.google_wallet_enabled),
     p_apple_wallet_enabled: bool(input.apple_wallet_enabled),
   });
-  return interpret(data, error, input.organizationId);
+  return interpret(data, error, [`/admin/org/${input.organizationId}/configuracoes`]);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +99,7 @@ export async function createLocation(input: {
     p_slug: slug,
     p_address: cleanAddress(input?.address),
   });
-  return interpret(data, error, input.organizationId);
+  return interpret(data, error, [`/admin/org/${input.organizationId}/configuracoes`]);
 }
 
 export async function updateLocation(input: {
@@ -207,7 +136,7 @@ export async function updateLocation(input: {
     p_address:
       input?.address === undefined ? undefined : cleanAddress(input.address),
   });
-  return interpret(data, error, input.organizationId);
+  return interpret(data, error, [`/admin/org/${input.organizationId}/configuracoes`]);
 }
 
 export async function setLocationStatus(input: {
@@ -228,7 +157,7 @@ export async function setLocationStatus(input: {
     p_location_id: input.locationId,
     p_status: input.status,
   });
-  return interpret(data, error, input.organizationId);
+  return interpret(data, error, [`/admin/org/${input.organizationId}/configuracoes`]);
 }
 
 /**
