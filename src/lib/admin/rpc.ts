@@ -42,6 +42,9 @@ const REASON_MESSAGE: Record<string, string> = {
     "Não foi possível enviar o convite. Confira o e-mail e tente novamente.",
   slug_taken: "Já existe uma unidade com esse identificador.",
   no_changes: "Nenhuma alteração para salvar.",
+  invalid_period: "A data de término deve ser depois da data de início.",
+  campaign_limit_reached:
+    "Limite de 5 campanhas ativas atingido. Desative uma campanha para ativar outra ou fale com a Fidelize.club para aumentar o limite.",
   network:
     "Não foi possível concluir agora. Verifique a conexão e tente novamente.",
 };

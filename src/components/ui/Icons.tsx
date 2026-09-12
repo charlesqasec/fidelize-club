@@ -361,3 +361,26 @@ export function IconAlert(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconBot(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 4.3v2.9" />
+      <circle cx="12" cy="3.4" r="1" fill="currentColor" stroke="none" />
+      <rect x="4.3" y="7.2" width="15.4" height="11" rx="3.2" />
+      <circle cx="9.2" cy="12.7" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="14.8" cy="12.7" r="1.3" fill="currentColor" stroke="none" />
+      <path d="M9 16.3h6" />
+      <path d="M2.3 11.5v3.4M21.7 11.5v3.4" />
+    </Svg>
+  );
+}
+
+export function IconSearch(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="M19.5 19.5l-4.3-4.3" />
+    </Svg>
+  );
+}

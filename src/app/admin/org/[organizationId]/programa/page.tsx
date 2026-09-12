@@ -19,11 +19,13 @@ export const metadata: Metadata = {
 };
 
 /**
- * Programa de fidelidade — PAINEL DO ESTABELECIMENTO (ETAPA 4.6C). Leitura
- * para todos os papéis; edição de programa (nome/status/regras
- * whitelisted), identidade visual e recompensas para OWNER / platform
- * admin (`canEdit`). `type` do programa nunca é editável (decisão da
- * ETAPA 4.6C). A UI só decide o que OFERECE — a autoridade de RBAC é o
+ * Programa de fidelidade — PAINEL DO ESTABELECIMENTO. Leitura para todos
+ * os papéis; edição de programa (nome/status/regras whitelisted),
+ * identidade visual e recompensas SOMENTE para PLATFORM_ADMIN (ETAPA 4.6F,
+ * regra do MVP pós-homologação: "Programa, regras, identidade visual e
+ * recompensas: estabelecimento consulta; Fidelize Admin configura." —
+ * revoga o acesso que OWNER tinha na ETAPA 4.6C). `type` do programa nunca
+ * é editável. A UI só decide o que OFERECE — a autoridade de RBAC é o
  * servidor: as Server Actions revalidam o acesso e as RPCs `admin_*`
  * (SECURITY DEFINER) validam `auth.uid()`, `organization_id` e papel
  * dentro da operação, e registram `audit_logs`.
@@ -37,7 +39,7 @@ export default async function ProgramaPage({
   const { supabase, access } = await requireOrgAccess(organizationId);
 
   const role = access.viewerRole;
-  const canEdit = role === "PLATFORM_ADMIN" || role === "OWNER";
+  const canEdit = role === "PLATFORM_ADMIN";
 
   const { data: programs } = await supabase
     .from("loyalty_programs")

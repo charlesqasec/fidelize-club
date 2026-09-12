@@ -1489,6 +1489,16 @@ export type Database = {
         Args: { p_organization_id: string; p_role: string; p_user_id: string }
         Returns: Json
       }
+      admin_create_campaign: {
+        Args: {
+          p_end_at?: string
+          p_name: string
+          p_organization_id: string
+          p_program_id?: string
+          p_start_at?: string
+        }
+        Returns: Json
+      }
       admin_create_location: {
         Args: {
           p_address?: Json
@@ -1508,9 +1518,29 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_get_customer_detail: {
+        Args: { p_membership_id: string; p_organization_id: string }
+        Returns: Json
+      }
+      admin_list_org_customers: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       admin_org_actor_role: {
         Args: { p_organization_id: string }
         Returns: string
+      }
+      admin_org_ai_agent_overview: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      admin_org_nfc_qr_overview: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      admin_set_campaign_status: {
+        Args: { p_campaign_id: string; p_status: string }
+        Returns: Json
       }
       admin_set_location_status: {
         Args: { p_location_id: string; p_status: string }
@@ -1526,6 +1556,17 @@ export type Database = {
       }
       admin_set_reward_status: {
         Args: { p_reward_id: string; p_status: string }
+        Returns: Json
+      }
+      admin_update_campaign: {
+        Args: {
+          p_campaign_id: string
+          p_clear_program?: boolean
+          p_end_at?: string
+          p_name?: string
+          p_program_id?: string
+          p_start_at?: string
+        }
         Returns: Json
       }
       admin_update_feature_flags: {

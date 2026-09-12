@@ -1,20 +1,15 @@
 import type { Metadata } from "next";
 
-import { AdminNotice } from "@/components/admin/AdminNotice";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { Badge } from "@/components/admin/Badge";
-import { DataTable } from "@/components/admin/DataTable";
 import { EmptyState } from "@/components/admin/EmptyState";
 import { SectionCard } from "@/components/admin/SectionCard";
 import { StatCard } from "@/components/admin/StatCard";
 import {
-  formatDate,
-  formatDateTime,
-  formatNumber,
-  shortId,
-} from "@/lib/admin/format";
+  CustomersTable,
+  type OrgCustomerRow,
+} from "@/components/admin/clientes-panel/CustomersTable";
+import { formatNumber } from "@/lib/admin/format";
 import { requireOrgAccess } from "@/lib/admin/org-access";
-import { programTypeLabel, statusView } from "@/lib/admin/status";
 import { IconCheck, IconClock, IconUsers } from "@/components/ui/Icons";
 
 export const metadata: Metadata = {
@@ -22,34 +17,21 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function CustomerAvatar({ name }: { name: string | null }) {
-  const initial = name?.trim().charAt(0).toUpperCase();
-  return (
-    <span
-      aria-hidden="true"
-      className={[
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-        initial
-          ? "bg-brand-100 text-brand-800"
-          : "bg-surface-soft text-ink-muted ring-1 ring-inset ring-line",
-      ].join(" ")}
-    >
-      {initial ?? "#"}
-    </span>
-  );
-}
-
 /**
- * Clientes da organização = `customer_memberships` filtrado por
- * `organization_id` (RLS: `is_org_member` ou `is_platform_admin`).
- *
- * O NOME do cliente vive em `public.customers`, que é entidade global e
- * **não tem policy de leitura para a equipe do estabelecimento** nesta
- * etapa (docs/BANCO_DE_DADOS.md, seção 5.1). Então o embed `customers(name)`
- * volta preenchido para o platform_admin e `null` para OWNER/MANAGER/STAFF —
- * neste caso mostramos um identificador curto e não secreto da adesão. A
- * listagem com nome para o próprio estabelecimento depende da view/function
- * dedicada da ETAPA 7 — não de afrouxar a RLS aqui.
+ * Clientes da organização — PAINEL DO ESTABELECIMENTO (ETAPA 4.6F, regra do
+ * MVP pós-homologação: "estabelecimento pode identificar e consultar
+ * somente seus próprios clientes, saldo/progresso, visitas/selos, última
+ * atividade e histórico"). Fonte: RPC `admin_list_org_customers`
+ * (SECURITY DEFINER, só leitura) — não um SELECT direto em
+ * `public.customers`, que é entidade GLOBAL sem `organization_id` e por
+ * isso nunca ganha policy de leitura ampla para a equipe do
+ * estabelecimento (docs/BANCO_DE_DADOS.md, seção 5.1). A RPC faz o join
+ * com `customer_memberships` e filtra por `organization_id` sempre a
+ * partir do parâmetro — isolamento multi-tenant preservado, nada de RLS
+ * enfraquecida. Retorna só os campos de listagem (nunca e-mail/telefone/
+ * histórico) — o histórico completo fica em `admin_get_customer_detail`,
+ * usado pela página de detalhe (`[membershipId]/page.tsx`). Sem
+ * criar/excluir/exportar: não há RPC alguma para isso.
  */
 export default async function ClientesPage({
   params,
@@ -57,19 +39,13 @@ export default async function ClientesPage({
   params: Promise<{ organizationId: string }>;
 }) {
   const { organizationId } = await params;
-  const { supabase, access } = await requireOrgAccess(organizationId);
+  const { supabase } = await requireOrgAccess(organizationId);
 
-  const { data: memberships } = await supabase
-    .from("customer_memberships")
-    .select(
-      "id, status, current_points, current_stamps, current_visits, joined_at, last_activity_at, customer:customers(name), program:loyalty_programs(name, type)",
-    )
-    .eq("organization_id", organizationId)
-    .order("joined_at", { ascending: false })
-    .limit(200);
-
-  const rows = memberships ?? [];
-  const canSeeNames = access.viewerRole === "PLATFORM_ADMIN";
+  const { data } = await supabase.rpc("admin_list_org_customers", {
+    p_organization_id: organizationId,
+  });
+  const payload = data as { ok?: boolean; customers?: OrgCustomerRow[] } | null;
+  const rows = payload?.ok ? (payload.customers ?? []) : [];
 
   // Derivados apenas das linhas carregadas (até 200) — nunca extrapolados.
   const activeRows = rows.filter((row) => row.status === "ACTIVE").length;
@@ -82,14 +58,6 @@ export default async function ClientesPage({
         title="Clientes"
         description="Consumidores que aderiram a um programa deste estabelecimento, com saldo e última atividade reais."
       />
-
-      {!canSeeNames ? (
-        <AdminNotice variant="restricted" title="Nomes não exibidos para o seu perfil">
-          Nesta etapa os nomes dos clientes ficam visíveis apenas para a
-          equipe Fidelize. Cada adesão aparece com um identificador curto —
-          o isolamento entre estabelecimentos não é enfraquecido para isso.
-        </AdminNotice>
-      ) : null}
 
       {rows.length === 0 ? (
         <EmptyState
@@ -123,7 +91,7 @@ export default async function ClientesPage({
 
           <SectionCard
             title="Adesões"
-            description="Ordenadas da mais recente para a mais antiga."
+            description="Busque por nome ou navegue pela lista, ordenada da mais recente para a mais antiga."
             flush
             footer={
               rows.length >= 200
@@ -131,89 +99,7 @@ export default async function ClientesPage({
                 : `${formatNumber(rows.length)} ${rows.length === 1 ? "adesão" : "adesões"}.`
             }
           >
-            <DataTable
-              caption="Clientes com adesão a programas deste estabelecimento"
-              rows={rows}
-              rowKey={(row) => row.id}
-              minWidth={860}
-              columns={[
-                {
-                  id: "customer",
-                  header: "Cliente",
-                  mobile: "title",
-                  cell: (row) => {
-                    const name = row.customer?.name ?? null;
-                    return (
-                      <div className="flex min-w-0 items-center gap-3">
-                        <CustomerAvatar name={name} />
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-brand-950">
-                            {name ?? `Adesão ${shortId(row.id)}`}
-                          </p>
-                          <p className="truncate text-xs text-ink-muted">
-                            {row.program?.name ?? "—"}
-                            {row.program?.type
-                              ? ` · ${programTypeLabel(row.program.type)}`
-                              : ""}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  },
-                },
-                {
-                  id: "joined",
-                  header: "Adesão",
-                  className: "whitespace-nowrap text-ink-soft",
-                  cell: (row) => formatDate(row.joined_at),
-                },
-                {
-                  id: "points",
-                  header: "Pontos",
-                  align: "right",
-                  className: "tabular-nums",
-                  cell: (row) => formatNumber(row.current_points),
-                },
-                {
-                  id: "visits",
-                  header: "Visitas",
-                  align: "right",
-                  className: "tabular-nums",
-                  cell: (row) => formatNumber(row.current_visits),
-                },
-                {
-                  id: "stamps",
-                  header: "Selos",
-                  align: "right",
-                  className: "tabular-nums",
-                  cell: (row) => formatNumber(row.current_stamps),
-                },
-                {
-                  id: "last",
-                  header: "Última atividade",
-                  className: "whitespace-nowrap text-ink-soft",
-                  cell: (row) =>
-                    row.last_activity_at ? (
-                      formatDateTime(row.last_activity_at)
-                    ) : (
-                      <span className="text-ink-muted">Sem atividade</span>
-                    ),
-                },
-                {
-                  id: "status",
-                  header: "Status",
-                  mobile: "badge",
-                  cell: (row) => {
-                    const view = statusView.membership(row.status);
-                    return (
-                      <Badge tone={view.tone} dot={row.status === "ACTIVE"}>
-                        {view.label}
-                      </Badge>
-                    );
-                  },
-                },
-              ]}
-            />
+            <CustomersTable organizationId={organizationId} rows={rows} />
           </SectionCard>
         </>
       )}

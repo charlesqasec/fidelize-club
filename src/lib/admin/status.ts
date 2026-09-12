@@ -100,6 +100,20 @@ const LOCATION: Record<string, StatusView> = {
   INACTIVE: { label: "Inativa", tone: "neutral" },
 };
 
+/** admin_org_nfc_qr_overview: nfc_status / qr_status por unidade. */
+const NFC_QR_CHANNEL: Record<string, StatusView> = {
+  ACTIVE: { label: "Ativo", tone: "positive" },
+  INACTIVE: { label: "Inativo", tone: "neutral" },
+  NONE: { label: "Não configurado", tone: "neutral" },
+};
+
+/** admin_org_nfc_qr_overview: overall_status. */
+const NFC_QR_OVERALL: Record<string, StatusView> = {
+  OPERATIONAL: { label: "Operacional", tone: "positive" },
+  PARTIAL: { label: "Parcial", tone: "warning" },
+  NOT_CONFIGURED: { label: "Não configurado", tone: "neutral" },
+};
+
 export const statusView = {
   organization: (v: string | null | undefined) => lookup(ORGANIZATION, v),
   program: (v: string | null | undefined) => lookup(PROGRAM, v),
@@ -113,6 +127,8 @@ export const statusView = {
   reviewChannel: (v: string | null | undefined) => lookup(REVIEW_CHANNEL, v),
   member: (v: string | null | undefined) => lookup(MEMBER, v),
   location: (v: string | null | undefined) => lookup(LOCATION, v),
+  nfcQrChannel: (v: string | null | undefined) => lookup(NFC_QR_CHANNEL, v),
+  nfcQrOverall: (v: string | null | undefined) => lookup(NFC_QR_OVERALL, v),
 };
 
 const PROGRAM_TYPE: Record<string, string> = {

@@ -32,13 +32,15 @@ export const metadata: Metadata = {
 };
 
 /**
- * Configurações do PAINEL DO ESTABELECIMENTO (ETAPA 4.6B / bloco 1, ETAPA
- * 4.6D para Equipe). Leitura como antes; escrita de organização, canais,
- * unidades e equipe conforme o papel do usuário:
- *
- *   PLATFORM_ADMIN / OWNER -> organização, canais, unidades e equipe
- *   MANAGER                -> apenas unidades
- *   STAFF                  -> somente leitura
+ * Configurações do PAINEL DO ESTABELECIMENTO. Leitura para todos os
+ * papéis; escrita de organização, canais, unidades e equipe SOMENTE para
+ * PLATFORM_ADMIN (ETAPA 4.6F, regra do MVP pós-homologação: "Configurações
+ * estruturais: estabelecimento consulta; criação/edição/desativação ficam
+ * com Fidelize Admin." — revoga o acesso que OWNER tinha em organização/
+ * canais/equipe e OWNER+MANAGER tinham em unidades, ETAPAs 4.6B/4.6D).
+ * OWNER/MANAGER/STAFF do estabelecimento ficam todos somente leitura
+ * aqui — o acesso principal do MVP (OWNER) segue existindo para o resto
+ * do painel, só não escreve mais configuração estrutural.
  *
  * A UI só decide o que OFERECE. A autoridade de RBAC é o servidor: as
  * Server Actions revalidam o acesso e as RPCs `admin_*` (SECURITY DEFINER)
@@ -102,15 +104,10 @@ export default async function OrganizationConfiguracoesPage({
   );
 
   const role = access.viewerRole;
-  const canEditOrg = role === "PLATFORM_ADMIN" || role === "OWNER";
-  const canEditLocations =
-    role === "PLATFORM_ADMIN" || role === "OWNER" || role === "MANAGER";
+  const canEditOrg = role === "PLATFORM_ADMIN";
+  const canEditLocations = role === "PLATFORM_ADMIN";
   const assignableMemberRoles: ("OWNER" | "MANAGER" | "STAFF")[] =
-    role === "PLATFORM_ADMIN"
-      ? ["OWNER", "MANAGER", "STAFF"]
-      : role === "OWNER"
-        ? ["MANAGER", "STAFF"]
-        : [];
+    role === "PLATFORM_ADMIN" ? ["OWNER", "MANAGER", "STAFF"] : [];
 
   const accessLabel =
     role === "PLATFORM_ADMIN"
@@ -143,6 +140,17 @@ export default async function OrganizationConfiguracoesPage({
     email: profileById.get(member.user_id)?.email ?? null,
   }));
 
+  // Acesso principal do MVP (ETAPA 4.6F): estabelecimento vê só este acesso
+  // — nunca a lista completa de membros/contas técnicas. OWNER ativo tem
+  // prioridade; sem ele, cai para qualquer acesso ativo e, por fim, o
+  // primeiro cadastrado. `canEditOrg` (PLATFORM_ADMIN) continua vendo a
+  // equipe inteira via `TeamManager`, sem mudança nenhuma.
+  const primaryAccess =
+    memberRows.find((member) => member.role === "OWNER" && member.status === "ACTIVE") ??
+    memberRows.find((member) => member.status === "ACTIVE") ??
+    memberRows[0] ??
+    null;
+
   return (
     <div className="space-y-6">
       <AdminPageHeader
@@ -150,9 +158,7 @@ export default async function OrganizationConfiguracoesPage({
         title="Configurações"
         description="Dados do estabelecimento, unidades, equipe e canais habilitados."
         actions={
-          role === "STAFF" ? (
-            <Badge tone="brand">Somente leitura</Badge>
-          ) : undefined
+          !canEditOrg ? <Badge tone="brand">Somente leitura</Badge> : undefined
         }
       />
 
@@ -193,16 +199,56 @@ export default async function OrganizationConfiguracoesPage({
       </SectionCard>
 
       <SectionCard
-        title="Equipe"
-        description="Pessoas com acesso a este estabelecimento e o papel de cada uma."
+        title={canEditOrg ? "Equipe" : "Acesso principal"}
+        description={
+          canEditOrg
+            ? "Pessoas com acesso a este estabelecimento e o papel de cada uma."
+            : "MVP: um acesso principal por estabelecimento. Contas técnicas e gestão completa de equipe ficam com a Fidelize.club."
+        }
         icon={<IconUsers className="h-5 w-5" />}
       >
-        <TeamManager
-          organizationId={organizationId}
-          members={memberRows}
-          canManage={canEditOrg}
-          assignableRoles={assignableMemberRoles}
-        />
+        {canEditOrg ? (
+          <TeamManager
+            organizationId={organizationId}
+            members={memberRows}
+            canManage={canEditOrg}
+            assignableRoles={assignableMemberRoles}
+          />
+        ) : primaryAccess ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line p-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span
+                aria-hidden="true"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-800"
+              >
+                {(primaryAccess.name ?? primaryAccess.email ?? "?")
+                  .charAt(0)
+                  .toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-medium text-brand-950">
+                  {primaryAccess.name ?? "Sem nome cadastrado"}
+                </p>
+                <p className="truncate text-xs text-ink-muted">
+                  {primaryAccess.email ?? "—"}
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Badge tone="brand">{orgRoleLabel(primaryAccess.role)}</Badge>
+              <Badge
+                tone={statusView.member(primaryAccess.status).tone}
+                dot={primaryAccess.status === "ACTIVE"}
+              >
+                {statusView.member(primaryAccess.status).label}
+              </Badge>
+            </div>
+          </div>
+        ) : (
+          <InlineEmpty icon={<IconUsers className="h-4 w-4" />}>
+            Nenhum acesso vinculado ainda.
+          </InlineEmpty>
+        )}
       </SectionCard>
 
       <SectionCard

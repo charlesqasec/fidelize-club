@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { AdminNotice } from "@/components/admin/AdminNotice";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Badge } from "@/components/admin/Badge";
 import { DataTable } from "@/components/admin/DataTable";
@@ -35,15 +34,115 @@ function MonoChip({ children }: { children: string }) {
   );
 }
 
+type LocationOverview = {
+  location_id: string;
+  location_name: string;
+  nfc_status: string;
+  qr_status: string;
+};
+
 /**
- * Dispositivos NFC e tokens QR da organização. Estas tabelas guardam
- * segredo (`nfc_devices.secret_hash`, `qr_tokens.token`) e por isso, nesta
- * etapa, só têm policy de leitura para `platform_admin`
- * (docs/BANCO_DE_DADOS.md, seção 5.2) — a equipe do estabelecimento vê a
- * lista vazia até existir uma view sem as colunas sensíveis (ETAPA 10).
- *
- * Mesmo para quem pode ler, esta tela **não seleciona** `secret_hash` nem
- * `token`: mostra apenas identificadores públicos e metadados.
+ * Visão do ESTABELECIMENTO (OWNER/MANAGER/STAFF) — nunca uma tela vazia
+ * (ETAPA 4.6F, regra do MVP pós-homologação: "Não deixar tela vazia para o
+ * estabelecimento. Mostrar somente informações operacionais seguras: status
+ * QR, status NFC, unidade vinculada e status geral."). Fonte:
+ * `admin_org_nfc_qr_overview` (SECURITY DEFINER, só leitura,
+ * 20260912152000) — nunca seleciona `secret_hash`/`token`/
+ * `public_identifier`, só o agregado ACTIVE/INACTIVE/NONE por unidade.
+ * Ainda não há validação/antifraude aqui (fora de escopo desta etapa).
+ */
+async function EstablishmentOverview({
+  supabase,
+  organizationId,
+}: {
+  supabase: Awaited<ReturnType<typeof requireOrgAccess>>["supabase"];
+  organizationId: string;
+}) {
+  const { data } = await supabase.rpc("admin_org_nfc_qr_overview", {
+    p_organization_id: organizationId,
+  });
+  const payload = data as
+    | { ok?: boolean; overall_status?: string; locations?: LocationOverview[] }
+    | null;
+
+  const locations = payload?.ok ? (payload.locations ?? []) : [];
+  const overall = statusView.nfcQrOverall(payload?.overall_status);
+
+  return (
+    <div className="space-y-6">
+      <AdminPageHeader
+        eyebrow="Check-in físico"
+        title="NFC & QR"
+        description="Status operacional de NFC e QR Code por unidade deste estabelecimento. Sem tokens, segredos ou configuração sensível."
+        actions={
+          <Badge tone={overall.tone} dot={payload?.overall_status === "OPERATIONAL"} size="md">
+            {overall.label}
+          </Badge>
+        }
+      />
+
+      {locations.length === 0 ? (
+        <EmptyState
+          icon={<IconNfc className="h-6 w-6" />}
+          title="Nenhuma unidade cadastrada ainda"
+          description="Assim que houver uma unidade neste estabelecimento, o status de NFC e QR Code dela aparece aqui."
+        />
+      ) : (
+        <SectionCard
+          title="Unidades"
+          description="Status de check-in por unidade — nunca o token, o segredo ou o identificador completo do dispositivo."
+          icon={<IconMapPin className="h-5 w-5" />}
+        >
+          <ul
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+            aria-label="Status de NFC e QR por unidade"
+          >
+            {locations.map((location) => {
+              const nfc = statusView.nfcQrChannel(location.nfc_status);
+              const qr = statusView.nfcQrChannel(location.qr_status);
+              return (
+                <li
+                  key={location.location_id}
+                  className="rounded-xl border border-line bg-surface-soft/60 px-4 py-3.5"
+                >
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-brand-950">
+                    <IconMapPin className="h-4 w-4 text-ink-muted" aria-hidden="true" />
+                    {location.location_name}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <IconNfc className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
+                      <span className="text-ink-soft">NFC</span>
+                      <Badge tone={nfc.tone} dot={location.nfc_status === "ACTIVE"}>
+                        {nfc.label}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <IconQr className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
+                      <span className="text-ink-soft">QR</span>
+                      <Badge tone={qr.tone} dot={location.qr_status === "ACTIVE"}>
+                        {qr.label}
+                      </Badge>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </SectionCard>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Dispositivos NFC e tokens QR da organização — visão da EQUIPE FIDELIZE
+ * (PLATFORM_ADMIN). Estas tabelas guardam segredo (`nfc_devices.secret_hash`,
+ * `qr_tokens.token`) e por isso só têm policy de leitura direta para
+ * `platform_admin` (docs/BANCO_DE_DADOS.md, seção 5.2). Mesmo aqui, a tela
+ * **não seleciona** `secret_hash` nem `token`: mostra apenas identificadores
+ * públicos e metadados. Visão do estabelecimento fica em
+ * `EstablishmentOverview` (acima).
  */
 export default async function NfcQrPage({
   params,
@@ -52,6 +151,12 @@ export default async function NfcQrPage({
 }) {
   const { organizationId } = await params;
   const { supabase, access } = await requireOrgAccess(organizationId);
+
+  if (access.viewerRole !== "PLATFORM_ADMIN") {
+    return (
+      <EstablishmentOverview supabase={supabase} organizationId={organizationId} />
+    );
+  }
 
   const [devicesResult, tokensResult] = await Promise.all([
     supabase
@@ -72,7 +177,6 @@ export default async function NfcQrPage({
 
   const devices = devicesResult.data ?? [];
   const tokens = tokensResult.data ?? [];
-  const restrictedForRole = access.viewerRole !== "PLATFORM_ADMIN";
 
   const nothing = devices.length === 0 && tokens.length === 0;
   const activeDevices = devices.filter((device) => device.status === "ACTIVE").length;
@@ -86,28 +190,12 @@ export default async function NfcQrPage({
         description="Tags NFC e QR Codes usados para check-in nas unidades. Segredos e tokens completos nunca são exibidos."
       />
 
-      {restrictedForRole ? (
-        <AdminNotice variant="restricted" title="Visível apenas para a equipe Fidelize">
-          Nesta etapa, dispositivos NFC e tokens QR carregam segredos e por
-          isso só a equipe Fidelize os consulta. A visão para o estabelecimento
-          chega junto com o check-in físico e o antifraude.
-        </AdminNotice>
-      ) : null}
-
       {nothing ? (
-        restrictedForRole ? (
-          <EmptyState
-            variant="restricted"
-            title="Seu perfil não consulta esta área ainda"
-            description="Quando a visão do estabelecimento estiver disponível, os dispositivos e QR Codes das suas unidades aparecem aqui — sem expor nenhum segredo."
-          />
-        ) : (
-          <EmptyState
-            icon={<IconNfc className="h-6 w-6" />}
-            title="Nenhum dispositivo ou token ainda"
-            description="Tags NFC e QR Codes por unidade aparecem aqui quando forem provisionados para este estabelecimento."
-          />
-        )
+        <EmptyState
+          icon={<IconNfc className="h-6 w-6" />}
+          title="Nenhum dispositivo ou token ainda"
+          description="Tags NFC e QR Codes por unidade aparecem aqui quando forem provisionados para este estabelecimento."
+        />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

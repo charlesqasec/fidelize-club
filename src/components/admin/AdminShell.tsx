@@ -323,12 +323,14 @@ export function AdminShell({
               <IconMenu className="h-5 w-5" />
             </button>
             <Logo />
-            <span className="hidden items-center gap-2 sm:inline-flex">
-              <span aria-hidden="true" className="h-5 w-px bg-line" />
-              <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 ring-1 ring-inset ring-brand-100">
-                Admin
+            {!orgContext || showPlatformSwitch ? (
+              <span className="hidden items-center gap-2 sm:inline-flex">
+                <span aria-hidden="true" className="h-5 w-px bg-line" />
+                <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 ring-1 ring-inset ring-brand-100">
+                  Fidelize Admin
+                </span>
               </span>
-            </span>
+            ) : null}
           </div>
 
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AiAgentCard, type AiAgentOverview } from "@/components/admin/AiAgentCard";
 import { Badge } from "@/components/admin/Badge";
 import { EmptyState } from "@/components/admin/EmptyState";
 import { RatingStars } from "@/components/admin/RatingStars";
@@ -59,6 +60,14 @@ function SectionLink({ href, children }: { href: string; children: string }) {
  * query passa pela RLS da sessão do usuário; nada de `service_role`.
  * Métricas nunca são inventadas: sem dados, os cards mostram `0` e a lista
  * mostra um estado vazio coerente.
+ *
+ * Bloco "Agente de IA" (ETAPA 4.6G, fechamento do MVP): card de insights,
+ * hoje só "clientes sem retorno há mais de 30 dias", calculado por
+ * `admin_org_ai_agent_overview` (SQL determinístico, sem LLM externa — ver
+ * `AiAgentCard`). Escondido quando `noOperation`, porque o estado vazio
+ * abaixo já cobre "organização sem histórico ainda". O CTA "Criar campanha"
+ * só navega e pré-preenche `/campanhas` (`novaCampanha=1&nome=...`) — nunca
+ * cria nem dispara nada sozinho.
  */
 export default async function OrganizationHomePage({
   params,
@@ -79,6 +88,7 @@ export default async function OrganizationHomePage({
     feedbackRatings,
     recentActivity,
     programs,
+    aiAgentOverview,
   ] = await Promise.all([
     supabase
       .from("customer_memberships")
@@ -119,6 +129,9 @@ export default async function OrganizationHomePage({
       .select("id, name, type, status")
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: true }),
+    supabase.rpc("admin_org_ai_agent_overview", {
+      p_organization_id: organizationId,
+    }),
   ]);
 
   const ratings = feedbackRatings.data ?? [];
@@ -137,6 +150,27 @@ export default async function OrganizationHomePage({
     programList.length === 0 &&
     (membershipsTotal.count ?? 0) === 0;
 
+  const aiAgentPayload = aiAgentOverview.data as
+    | {
+        ok?: boolean;
+        has_enough_data?: boolean;
+        evaluated_count?: number;
+        no_return_30d_count?: number;
+      }
+    | null;
+  const aiAgentData: AiAgentOverview | null = aiAgentPayload?.ok
+    ? {
+        hasEnoughData: Boolean(aiAgentPayload.has_enough_data),
+        evaluatedCount: aiAgentPayload.evaluated_count ?? 0,
+        noReturnCount: aiAgentPayload.no_return_30d_count ?? 0,
+      }
+    : null;
+  const canCreateCampaign =
+    access.viewerRole === "PLATFORM_ADMIN" || access.viewerRole === "OWNER";
+  const aiAgentCampaignHref = `${base}/campanhas?novaCampanha=1&nome=${encodeURIComponent(
+    "Recuperação de clientes inativos",
+  )}`;
+
   return (
     <div className="space-y-8">
       <AdminPageHeader
@@ -144,6 +178,14 @@ export default async function OrganizationHomePage({
         title="Visão geral"
         description="Resumo do estabelecimento com dados reais. Um número em zero significa que ainda não há registros — não uma falha."
       />
+
+      {noOperation ? null : (
+        <AiAgentCard
+          overview={aiAgentData}
+          campaignHref={aiAgentCampaignHref}
+          canCreateCampaign={canCreateCampaign}
+        />
+      )}
 
       <section aria-label="Indicadores principais">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
